@@ -20,7 +20,7 @@ Select     = require("soupselect").select
 HTMLParser = require "htmlparser"
 
 module.exports = (robot) ->
-  robot.respond /(wiki)( me)? (.*)/i, (msg) ->
+  robot.respond /(gwiki)( me)? (.*)/i, (msg) ->
     wikiMe msg, msg.match[3], (text, url) ->
       msg.send text
       msg.send url if url
