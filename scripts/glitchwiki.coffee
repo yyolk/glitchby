@@ -37,7 +37,7 @@ wikiMe = (msg, query, cb) ->
         return cb res.headers.location
 
       if /does not have an article/.test body
-        return cb "Wikipedia has no idea what you're talking about."
+        return cb "I have no idea; nothing in the wiki."
 
       paragraphs = parseHTML(body, "p")
 
