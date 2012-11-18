@@ -1,1 +1,1 @@
-web: bin/hubot -a irc -n glitchby
+app: bin/hubot -a irc -n glitchby
