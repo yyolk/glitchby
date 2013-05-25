@@ -15,7 +15,7 @@
     "url": "https://github.com/github/hubot.git"
   },
   "dependencies": {
-    "hubot-irc": "~0.1.4",
+    "hubot-irc": "0.1.13",
     "coffee-script": "~> 1.6.1",
     "optparse": "1.0.3",
     "scoped-http-client": "0.9.7",
