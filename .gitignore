@@ -1,3 +1,6 @@
 node_modules
+<<<<<<< HEAD
 .DS_Store*
 *.sw*
+=======
+>>>>>>> 7fa2df9c0bc1cb473d311e9ca8ca2b9abcb1e6fd
