@@ -2,8 +2,8 @@
   "name": "glitchby",
   "version": "2.3.2",
   "author": "GitHub Inc.",
-  "keywords": "github hubot campfire bot",
-  "description": "A simple helpful Robot for your Company",
+  "keywords": "teh real glitchbot",
+  "description": "A simple chat bot. With potential for more.",
   "licenses": [
     {
       "type": "MIT",
@@ -20,7 +20,8 @@
     "underscore": ">= 1.0.1",
     "hubot": "2.3.2",
     "hubot-scripts": ">= 2.1.0",
-    "optparse": "1.0.3"
+    "optparse": "1.0.3",
+    "hubot-jabbr": "0.3.x"    
   },
   "engines": {
     "node": "0.6.x",
