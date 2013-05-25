@@ -3,7 +3,6 @@ class Message
   #
   # user - A User instance that sent the message.
   constructor: (@user, @done = false) ->
-    @room = @user.room
 
   # Indicates that no other Listener should be called on this object
   #
@@ -16,8 +15,7 @@ class TextMessage extends Message
   #
   # user - A User instance that sent the message.
   # text - A String message.
-  # id   - A String of the message ID.
-  constructor: (@user, @text, @id) ->
+  constructor: (@user, @text) ->
     super @user
 
   # Determines if the message matches the given regex.
@@ -31,15 +29,11 @@ class TextMessage extends Message
 # Represents an incoming user entrance notification.
 #
 # user - A User instance for the user who entered.
-# text - Always null.
-# id   - A String of the message ID.
 class EnterMessage extends Message
 
 # Represents an incoming user exit notification.
 #
 # user - A User instance for the user who left.
-# text - Always null.
-# id   - A String of the message ID.
 class LeaveMessage extends Message
 
 class CatchAllMessage extends Message
@@ -48,10 +42,8 @@ class CatchAllMessage extends Message
   # message - The original message.
   constructor: (@message) ->
 
-module.exports = {
-  Message
-  TextMessage
-  EnterMessage
-  LeaveMessage
-  CatchAllMessage
-}
+module.exports.Message         = Message
+module.exports.TextMessage     = TextMessage
+module.exports.EnterMessage    = EnterMessage
+module.exports.LeaveMessage    = LeaveMessage
+module.exports.CatchAllMessage = CatchAllMessage

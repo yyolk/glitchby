@@ -7,10 +7,6 @@ class Response
   # message - A Message instance.
   # match   - A Match object from the successful Regex match.
   constructor: (@robot, @message, @match) ->
-    @envelope =
-      room: @message.room
-      user: @message.user
-      message: @message
 
   # Public: Posts a message back to the chat source
   #
@@ -19,16 +15,7 @@ class Response
   #
   # Returns nothing.
   send: (strings...) ->
-    @robot.adapter.send @envelope, strings...
-
-  # Public: Posts a message mentioning the current user.
-  #
-  # strings - One or more strings to be posted. The order of these strings
-  #           should be kept intact.
-  #
-  # Returns nothing.
-  reply: (strings...) ->
-    @robot.adapter.reply @envelope, strings...
+    @robot.adapter.send @message.user, strings...
 
   # Public: Posts a topic changing message
   #
@@ -37,16 +24,16 @@ class Response
   #
   # Returns nothing.
   topic: (strings...) ->
-    @robot.adapter.topic @envelope, strings...
+    @robot.adapter.topic @message.user, strings...
 
-  # Public: Play a sound in the chat source
+  # Public: Posts a message mentioning the current user.
   #
-  # strings - One or more strings to be posted as sounds to play. The order of
-  #           these strings should be kept intact.
+  # strings - One or more strings to be posted. The order of these strings
+  #           should be kept intact.
   #
-  # Returns nothing
-  play: (strings...) ->
-    @robot.adapter.play @envelope, strings...
+  # Returns nothing.
+  reply: (strings...) ->
+    @robot.adapter.reply @message.user, strings...
 
   # Public: Picks a random item from the given items.
   #

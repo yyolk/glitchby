@@ -15,7 +15,7 @@ class Creator
   #
   # Returns nothing.
   mkdirDashP: (path) ->
-    Fs.exists path, (exists) ->
+    Path.exists path, (exists) ->
       unless exists
         Fs.mkdir path, 0o0755, (err) ->
           throw err if err
@@ -64,9 +64,7 @@ class Creator
       "README.md",
       ".gitignore",
       "bin/hubot",
-      "bin/hubot.cmd",
-      "hubot-scripts.json",
-      "external-scripts.json"
+      "hubot-scripts.json"
     ]
 
     @copy "#{@templateDir}/#{file}", "#{@path}/#{file}" for file in files

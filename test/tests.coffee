@@ -43,7 +43,6 @@ class Helper extends Robot
     @sent = []
     @recipients = []
     @adapter = new Danger @
-    @alias = 'alias'
 
   stop: ->
     process.exit 0

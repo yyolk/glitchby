@@ -1,8 +1,7 @@
-Fs           = require 'fs'
-Log          = require 'log'
-Path         = require 'path'
-HttpClient   = require 'scoped-http-client'
-EventEmitter = require('events').EventEmitter;
+Fs         = require 'fs'
+Log        = require 'log'
+Path       = require 'path'
+HttpClient = require 'scoped-http-client'
 
 User                                                    = require './user'
 Brain                                                   = require './brain'
@@ -10,21 +9,11 @@ Response                                                = require './response'
 {Listener,TextListener}                                 = require './listener'
 {TextMessage,EnterMessage,LeaveMessage,CatchAllMessage} = require './message'
 
-HUBOT_DEFAULT_ADAPTERS = [
-  'campfire',
-  'shell'
-]
+inspect = require('util').inspect
 
-HUBOT_DOCUMENTATION_SECTIONS = [
-  'description',
-  'dependencies',
-  'configuration',
-  'commands',
-  'notes',
-  'author',
-  'examples',
-  'urls'
-]
+HUBOT_DEFAULT_ADAPTERS = [ 'campfire', 'shell' ]
+HUBOT_DOCUMENTATION_SECTIONS = [ 'description', 'dependencies', 'configuration', 'commands', 'notes', 'author', 'examples', 'urls' ]
+
 
 class Robot
   # Robots receive messages from a chat source (Campfire, irc, etc), and
@@ -37,17 +26,29 @@ class Robot
   constructor: (adapterPath, adapter, httpd, name = 'Hubot') ->
     @name         = name
     @brain        = new Brain
-    @events      = new EventEmitter
     @alias        = false
     @adapter      = null
     @Response     = Response
     @commands     = []
     @listeners    = []
+    @loadPaths    = []
+    @enableSlash  = false
     @logger       = new Log process.env.HUBOT_LOG_LEVEL or 'info'
 
     @parseVersion()
     @setupConnect() if httpd
     @loadAdapter adapterPath, adapter if adapter?
+
+    @documentation = {}
+
+  # Public: Specify a router and callback to register as Connect middleware.
+  #
+  # route    - A String of the route to match.
+  # callback - A Function that is called when the route is requested.
+  #
+  # Returns nothing.
+  route: (route, callback) ->
+    @router.get route, callback
 
   # Public: Adds a Listener that attempts to match incoming messages based on
   # a Regex.
@@ -80,10 +81,11 @@ class Robot
 
     if @alias
       alias = @alias.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') # escape alias for regexp
-      newRegex = new RegExp("^[@]?(?:#{alias}[:,]?|#{@name}[:,]?)\\s*(?:#{pattern})", modifiers)
+      newRegex = new RegExp("^(?:#{alias}[:,]?|#{@name}[:,]?)\\s*(?:#{pattern})", modifiers)
     else
-      newRegex = new RegExp("^[@]?#{@name}[:,]?\\s*(?:#{pattern})", modifiers)
+      newRegex = new RegExp("^#{@name}[:,]?\\s*(?:#{pattern})", modifiers)
 
+    @logger.debug newRegex.toString()
     @listeners.push new TextListener(@, newRegex, callback)
 
   # Public: Adds a Listener that triggers when anyone enters the room.
@@ -128,6 +130,20 @@ class Robot
     if message not instanceof CatchAllMessage and results.indexOf(true) is -1
       @receive new CatchAllMessage(message)
 
+  # Public: Loads every script in the given path.
+  #
+  # path - A String path on the filesystem.
+  #
+  # Returns nothing.
+  load: (path) ->
+    @logger.debug "Loading scripts from #{path}"
+
+    Path.exists path, (exists) =>
+      if exists
+        @loadPaths.push path
+        for file in Fs.readdirSync(path)
+          @loadFile path, file
+
   # Public: Loads a file in path.
   #
   # path - A String path on the filesystem.
@@ -142,22 +158,9 @@ class Robot
         require(full) @
         @parseHelp "#{path}/#{file}"
       catch error
-        @logger.error "Unable to load #{full}: #{error.stack}"
-        process.exit(1)
+        @logger.error "Unable to load #{full}: #{error}\n#{error.stack}"
 
-  # Public: Loads every script in the given path.
-  #
-  # path - A String path on the filesystem.
-  #
-  # Returns nothing.
-  load: (path) ->
-    @logger.debug "Loading scripts from #{path}"
-    Fs.exists path, (exists) =>
-      if exists
-        for file in Fs.readdirSync(path)
-          @loadFile path, file
-
-  # Public: Load scripts specfied in the `hubot-scripts.json` file.
+  # Public: Load scripts specfic in the `hubot-scripts.json` file.
   #
   # path    - A String path to the hubot-scripts files.
   # scripts - An Array of scripts to load.
@@ -168,28 +171,12 @@ class Robot
     for script in scripts
       @loadFile path, script
 
-  # Public: Load scripts from packages specfied in the
-  # `external-scripts.json` file.
-  #
-  # packages - An Array of packages containing hubot scripts to load.
-  #
-  # Returns nothing.
-  loadExternalScripts: (packages) ->
-    @logger.debug "Loading external-scripts from npm packages"
-    for pkg in packages
-      try
-        require(pkg) @
-      catch error
-        @logger.error "Error loading scripts from npm package - #{error}"
-        process.exit(1)
-
   # Setup the Connect server's defaults.
   #
   # Returns nothing.
   setupConnect: ->
     user = process.env.CONNECT_USER
     pass = process.env.CONNECT_PASSWORD
-    stat = process.env.CONNECT_STATIC
 
     Connect        = require 'connect'
     Connect.router = require 'connect_router'
@@ -198,7 +185,6 @@ class Robot
 
     @connect.use Connect.basicAuth(user, pass) if user and pass
     @connect.use Connect.bodyParser()
-    @connect.use Connect.static(stat) if stat
     @connect.use Connect.router (app) =>
 
       @router =
@@ -245,10 +231,9 @@ class Robot
       else
         "hubot-#{adapter}"
 
-      @adapter = require(path).use @
+      @adapter = require("#{path}").use(@)
     catch err
-      @logger.error "Cannot load adapter #{adapter} - #{err}"
-      process.exit(1)
+      @logger.error "Cannot load adapter #{adapter} - #{err}\n#{err.stack}"
 
   # Public: Help Commands for Running Scripts.
   #
@@ -262,10 +247,12 @@ class Robot
   #
   # Returns nothing.
   parseHelp: (path) ->
-    @logger.debug "Parsing help for #{path}"
+    @logger.debug "parseHelp of #{path}"
     scriptName = Path.basename(path).replace /\.(coffee|js)$/, ''
     scriptDocumentation = {}
+    @documentation[scriptName] = scriptDocumentation
 
+    @logger.debug "parseHelp populating @documentation[#{scriptName}]"
     Fs.readFile path, 'utf-8', (err, body) =>
       throw err if err?
 
@@ -273,7 +260,9 @@ class Robot
       for line in body.split "\n"
         break unless line[0] is '#' or line.substr(0, 2) is '//'
 
+        # remove leading comment
         cleanedLine = line.replace(/^(#|\/\/)\s?/, "").trim()
+        @logger.debug "parseHelp(#{scriptName}): read #{cleanedLine}"
 
         continue if cleanedLine.length is 0
         continue if cleanedLine.toLowerCase() is 'none'
@@ -282,19 +271,25 @@ class Robot
         if nextSection in HUBOT_DOCUMENTATION_SECTIONS
           currentSection = nextSection
           scriptDocumentation[currentSection] = []
+          @logger.debug "parseHelp(#{scriptName}): adding #{currentSection} section"
+        # lines in a section _do_ have leading whitespace
         else
           if currentSection
+            @logger.debug "parseHelp(#{scriptName}) adding '#{cleanedLine.trim()}' to #{currentSection}"
             scriptDocumentation[currentSection].push cleanedLine.trim()
-            if currentSection is 'commands'
+            if currentSection == 'commands'
               @commands.push cleanedLine.trim()
 
+      # no current section? probably using old style documentation
       if currentSection is null
         @logger.info "#{path} is using deprecated documentation syntax"
         scriptDocumentation.commands = []
         for line in body.split("\n")
-          break    if not (line[0] is '#' or line.substr(0, 2) is '//')
+          break    if not (line[0] == '#' or line.substr(0, 2) == '//')
           continue if not line.match('-')
           cleanedLine = line[2..line.length].replace(/^hubot/i, @name).trim()
+
+          @logger.debug "parseHelp(#{scriptName}) adding '#{cleanedLine}' to commands"
           scriptDocumentation.commands.push cleanedLine
           @commands.push cleanedLine
 
@@ -308,16 +303,6 @@ class Robot
   send: (user, strings...) ->
     @adapter.send user, strings...
 
-  # Public: A helper reply function which delegates to the adapter's reply
-  # function.
-  #
-  # user    - A User instance.
-  # strings - One or more Strings for each message to send.
-  #
-  # Returns nothing.
-  reply: (user, strings...) ->
-    @adapter.reply user, strings...
-
   # Public: A helper send function to message a room that the robot is in.
   #
   # room    - String designating the room to message.
@@ -328,26 +313,73 @@ class Robot
     user = { room: room }
     @adapter.send user, strings...
 
-  # Public: A wrapper around the EventEmitter API to make usage 
-  # semanticly better.
+  # Public: A helper reply function which delegates to the adapter's reply
+  # function.
   #
-  # event    - The event name.
-  # listener - A Function that is called with the event parameter
-  #            when event happens.
+  # user    - A User instance.
+  # strings - One or more Strings for each message to send.
   #
   # Returns nothing.
-  on: (event, args...) ->
-    @events.on event, args...
+  reply: (user, strings...) ->
+    @adapter.reply user, strings...
 
-  # Public: A wrapper around the EventEmitter API to make usage 
-  # semanticly better.
+  # Public: Get an Array of User objects stored in the brain.
   #
-  # event   - The event name.
-  # args...  - Arguments emitted by the event
+  # Returns an Array of User objects.
+  users: ->
+    @brain.data.users
+
+  # Public: Get a User object given a unique identifier.
   #
-  # Returns nothing.
-  emit: (event, args...) ->
-    @events.emit event, args...
+  # Returns a User instance of the specified user.
+  userForId: (id, options) ->
+    user = @brain.data.users[id]
+    unless user
+      user = new User id, options
+      @brain.data.users[id] = user
+
+    if options and options.room and (!user.room or user.room isnt options.room)
+      user = new User id, options
+      @brain.data.users[id] = user
+
+    user
+
+  # Public: Get a User object given a name.
+  #
+  # Returns a User instance for the user with the specified name.
+  userForName: (name) ->
+    result = null
+    lowerName = name.toLowerCase()
+    for k of (@brain.data.users or { })
+      userName = @brain.data.users[k]['name']
+      if userName? and userName.toLowerCase() is lowerName
+        result = @brain.data.users[k]
+    result
+
+  # Public: Get all users whose names match fuzzyName. Currently, match
+  # means 'starts with', but this could be extended to match initials,
+  # nicknames, etc.
+  #
+  # Returns an Array of User instances matching the fuzzy name.
+  usersForRawFuzzyName: (fuzzyName) ->
+    lowerFuzzyName = fuzzyName.toLowerCase()
+    user for key, user of (@brain.data.users or {}) when (
+      user.name.toLowerCase().lastIndexOf(lowerFuzzyName, 0) == 0)
+
+  # Public: If fuzzyName is an exact match for a user, returns an array with
+  # just that user. Otherwise, returns an array of all users for which
+  # fuzzyName is a raw fuzzy match (see usersForRawFuzzyName).
+  #
+  # Returns an Array of User instances matching the fuzzy name.
+  usersForFuzzyName: (fuzzyName) ->
+    matchedUsers = @usersForRawFuzzyName(fuzzyName)
+    lowerFuzzyName = fuzzyName.toLowerCase()
+    # We can scan matchedUsers rather than all users since usersForRawFuzzyName
+    # will include exact matches
+    for user in matchedUsers
+      return [user] if user.name.toLowerCase() is lowerFuzzyName
+
+    matchedUsers
 
   # Public: Kick off the event loop for the adapter
   #
@@ -366,7 +398,7 @@ class Robot
   #
   # Returns a String of the version number.
   parseVersion: ->
-    package_path = Path.join __dirname, '..', 'package.json'
+    package_path = __dirname + '/../package.json'
     data = Fs.readFileSync package_path, 'utf8'
     content = JSON.parse data
     @version = content.version
